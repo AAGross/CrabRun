@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Crab Side-Scrolling Game</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        #score,
+        #highScore {
+            position: absolute;
+            left: 10px;
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            font-family: Arial, sans-serif;
+        }
+
+        #score {
+            top: 10px;
+        }
+
+        #highScore {
+            top: 40px;
+        }
+
+        #gameOverMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">Score: 0</div>
+    <div id="highScore">High Score: 0</div>
+    <div id="gameOverMessage">
+        Game Over!<br>
+        Your score: <span id="finalScore"></span><br>
+        High score: <span id="finalHighScore"></span><br>
+        Press Space to restart
+    </div>
+
+    <audio id="background-music" loop>
+        <source src="CrabRave.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const highScoreElement = document.getElementById('highScore');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        const finalScoreElement = document.getElementById('finalScore');
+        const finalHighScoreElement = document.getElementById('finalHighScore');
+        const backgroundMusic = document.getElementById('background-music');
+
+        let score = 0;
+        let highScore = 0;
+        let gameOver = false;
+
+        const crab = {
+            x: 50,
+            y: 0,
+            width: 64,
+            height: 48,
+            speed: 5,
+            jumpForce: 20,
+            velocityY: 0,
+            isJumping: false
+        };
+
+        const ground = {
+            y: 0,
+            height: 50
+        };
+
+        const obstacles = [];
+        let lastObstacleTime = 0;
+
+        // Beach scenery
+        let sky = {
+            gradient: null
+        };
+
+        const sun = {
+            x: 0,
+            y: 100,
+            radius: 40,
+        };
+
+        let clouds = [];
+
+        // Rock with dancing crabs
+        const rock = {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 100
+        };
+
+        const dancingCrabs = [];
+
+        function initializeGame() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            crab.y = canvas.height - ground.height - crab.height;
+            ground.y = canvas.height - ground.height;
+
+            sky.gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            sky.gradient.addColorStop(0, "#87CEEB");
+            sky.gradient.addColorStop(1, "#E0F6FF");
+
+            sun.x = canvas.width - 100;
+
+            clouds = [
+                { x: canvas.width * 0.1, y: canvas.height * 0.1, size: 60, speed: 0.2 },
+                { x: canvas.width * 0.5, y: canvas.height * 0.2, size: 80, speed: 0.3 },
+                { x: canvas.width * 0.8, y: canvas.height * 0.15, size: 70, speed: 0.25 },
+            ];
+
+            // Initialize rock
+            rock.x = canvas.width * 0.75;
+            rock.y = ground.y - 120; // Adjust to sit on top of the water line
+
+            // Initialize dancing crabs
+            dancingCrabs.length = 0;
+            for (let i = 0; i < 3; i++) {
+                dancingCrabs.push({
+                    x: rock.x + 40 + i * 50,
+                    y: rock.y + 30,
+                    size: 20 + Math.random() * 10,
+                    danceCycle: Math.random() * Math.PI * 2,
+                    danceSpeed: 0.05 + Math.random() * 0.05
+                });
+            }
+
+            // Start playing background music
+            backgroundMusic.volume = 0.2; // Set volume to 20%      
+            backgroundMusic.play();
+        }
+
+        function drawBeachScenery() {
+            // Sky
+            ctx.fillStyle = sky.gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Sun
+            ctx.fillStyle = "yellow";
+            ctx.beginPath();
+            ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Clouds
+            ctx.fillStyle = "white";
+            clouds.forEach(cloud => {
+                drawCloud(cloud.x, cloud.y, cloud.size);
+            });
+
+            // Ocean
+            ctx.fillStyle = "#4BB5F0";
+            ctx.fillRect(0, ground.y - 20, canvas.width, 20);
+
+            // Beach
+            ctx.fillStyle = "#F0E68C";
+            ctx.fillRect(0, ground.y, canvas.width, ground.height);
+
+            // Rock
+            drawRock();
+
+            // Dancing crabs
+            drawDancingCrabs();
+        }
+
+        function drawCloud(x, y, size) {
+            ctx.beginPath();
+            ctx.arc(x, y, size * 0.4, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.3, y - size * 0.1, size * 0.3, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.5, y, size * 0.4, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.3, y + size * 0.1, size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawRock() {
+            ctx.fillStyle = '#808080';
+            ctx.beginPath();
+            ctx.moveTo(rock.x, rock.y + rock.height);
+            ctx.lineTo(rock.x + rock.width * 0.2, rock.y + rock.height * 0.3);
+            ctx.lineTo(rock.x + rock.width * 0.4, rock.y + rock.height * 0.5);
+            ctx.lineTo(rock.x + rock.width * 0.7, rock.y + rock.height * 0.2);
+            ctx.lineTo(rock.x + rock.width, rock.y + rock.height * 0.6);
+            ctx.lineTo(rock.x + rock.width, rock.y + rock.height);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawDancingCrabs() {
+            dancingCrabs.forEach(crab => {
+                const danceOffset = Math.sin(crab.danceCycle) * 5;
+                const clawOffset = Math.cos(crab.danceCycle) * 10;
+
+                // Body
+                ctx.fillStyle = '#FF6347';
+                ctx.fillRect(crab.x, crab.y + danceOffset, crab.size, crab.size * 0.75);
+
+                // Eyes
+                ctx.fillStyle = 'black';
+                ctx.fillRect(crab.x + crab.size * 0.2, crab.y + danceOffset + crab.size * 0.1, crab.size * 0.1, crab.size * 0.1);
+                ctx.fillRect(crab.x + crab.size * 0.7, crab.y + danceOffset + crab.size * 0.1, crab.size * 0.1, crab.size * 0.1);
+
+                // Claws
+                ctx.fillStyle = '#FF6347';
+                ctx.fillRect(crab.x - crab.size * 0.3, crab.y + danceOffset - clawOffset, crab.size * 0.3, crab.size * 0.4);
+                ctx.fillRect(crab.x + crab.size, crab.y + danceOffset - clawOffset, crab.size * 0.3, crab.size * 0.4);
+
+                // Update dance cycle
+                crab.danceCycle += crab.danceSpeed;
+            });
+        }
+
+        function updateClouds() {
+            clouds.forEach(cloud => {
+                cloud.x -= cloud.speed;
+                if (cloud.x + cloud.size < 0) {
+                    cloud.x = canvas.width + cloud.size;
+                }
+            });
+        }
+
+        function drawCrab() {
+            ctx.fillStyle = '#FF4500';
+            ctx.fillRect(crab.x, crab.y, crab.width, crab.height);
+            ctx.fillStyle = 'black';
+            ctx.fillRect(crab.x + 10, crab.y + 10, 10, 10);
+            ctx.fillRect(crab.x + crab.width - 20, crab.y + 10, 10, 10);
+            ctx.fillStyle = '#FF4500';
+            ctx.fillRect(crab.x - 15, crab.y + 15, 15, 20);
+            ctx.fillRect(crab.x + crab.width, crab.y + 15, 15, 20);
+            for (let i = 0; i < 4; i++) {
+                ctx.fillRect(crab.x + 10 + i * 15, crab.y + crab.height, 5, 15);
+            }
+        }
+
+        function drawObstacles() {
+            ctx.fillStyle = '#8B4513';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function updateCrab() {
+            if (crab.isJumping) {
+                crab.y -= crab.velocityY;
+                crab.velocityY -= 0.8;
+                if (crab.y >= canvas.height - ground.height - crab.height) {
+                    crab.y = canvas.height - ground.height - crab.height;
+                    crab.isJumping = false;
+                }
+            }
+        }
+
+        function updateObstacles() {
+            const currentTime = Date.now();
+            if (currentTime - lastObstacleTime > Math.random() * 1500 + 1200) {
+                const numObstacles = Math.random() < 0.2 ? 2 : 1;
+                for (let i = 0; i < numObstacles; i++) {
+                    obstacles.push({
+                        x: canvas.width + i * 100,
+                        y: ground.y - 40,
+                        width: 20,
+                        height: 40,
+                        speed: Math.random() * 2 + 4
+                    });
+                }
+                lastObstacleTime = currentTime;
+            }
+
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= obstacle.speed;
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    updateScore();
+                }
+
+                if (
+                    crab.x < obstacle.x + obstacle.width &&
+                    crab.x + crab.width > obstacle.x &&
+                    crab.y < obstacle.y + obstacle.height &&
+                    crab.y + crab.height > obstacle.y
+                ) {
+                    endGame();
+                }
+            });
+        }
+
+        function updateScore() {
+            scoreElement.textContent = 'Score: ' + score;
+            if (score > highScore) {
+                highScore = score;
+                highScoreElement.textContent = 'High Score: ' + highScore;
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            finalScoreElement.textContent = score;
+            finalHighScoreElement.textContent = highScore;
+            gameOverMessage.style.display = 'block';
+            backgroundMusic.pause();
+        }
+
+        function restartGame() {
+            gameOver = false;
+            obstacles.length = 0;
+            crab.x = 50;
+            crab.y = canvas.height - ground.height - crab.height;
+            score = 0;
+            updateScore();
+            gameOverMessage.style.display = 'none';
+            lastObstacleTime = 0;
+            backgroundMusic.currentTime = 0;
+            backgroundMusic.play();
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBeachScenery();
+
+            if (!gameOver) {
+                updateCrab();
+                updateObstacles();
+                updateClouds();
+            }
+
+            drawObstacles();
+            drawCrab();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                if (gameOver) {
+                    restartGame();
+                } else if (!crab.isJumping) {
+                    crab.isJumping = true;
+                    crab.velocityY = crab.jumpForce;
+                }
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            initializeGame();
+        });
+
+        initializeGame();
+        gameLoop();
+    </script>
+</body>
+
+</html>
