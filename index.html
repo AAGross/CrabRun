@@ -80,6 +80,7 @@
         const finalHighScoreElement = document.getElementById('finalHighScore');
         const backgroundMusic = document.getElementById('background-music');
 
+        let gameStarted = false;
         let score = 0;
         let highScore = 0;
         let gameOver = false;
@@ -368,7 +369,11 @@
 
         document.addEventListener('keydown', (event) => {
             if (event.code === 'Space') {
-                if (gameOver) {
+                if (!gameStarted) {
+                    gameStarted = true;
+                    initializeGame();
+                    gameLoop();
+                } else if (gameOver) {
                     restartGame();
                 } else if (!crab.isJumping) {
                     crab.isJumping = true;
@@ -378,11 +383,12 @@
         });
 
         window.addEventListener('resize', () => {
-            initializeGame();
+            if (gameStarted) {
+                initializeGame();
+            }
         });
 
-        initializeGame();
-        gameLoop();
+
     </script>
 </body>
 
