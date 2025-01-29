@@ -350,19 +350,36 @@
             backgroundMusic.play();
         }
 
+        function drawWelcomeScreen() {
+            // Ensure the canvas dimensions are set to the window dimensions
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            ctx.fillStyle = '#87CEEB'; // Sky blue background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'black';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press SPACE or TAP to Start', canvas.width / 2, canvas.height / 2);
+        }
+
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             drawBeachScenery();
 
-            if (!gameOver) {
-                updateCrab();
-                updateObstacles();
-                updateClouds();
+            if (!gameStarted) {
+                drawWelcomeScreen();
+            } else {
+                if (!gameOver) {
+                    updateCrab();
+                    updateObstacles();
+                    updateClouds();
+                }
+                drawObstacles();
+                drawCrab();
             }
-
-            drawObstacles();
-            drawCrab();
 
             requestAnimationFrame(gameLoop);
         }
@@ -372,7 +389,6 @@
                 if (!gameStarted) {
                     gameStarted = true;
                     initializeGame();
-                    gameLoop();
                 } else if (gameOver) {
                     restartGame();
                 } else if (!crab.isJumping) {
@@ -382,12 +398,26 @@
             }
         });
 
+        // Add touch event listener for mobile controls
+        canvas.addEventListener('touchstart', (event) => {
+            if (!gameStarted) {
+                gameStarted = true;
+                initializeGame();
+            } else if (gameOver) {
+                restartGame();
+            } else if (!crab.isJumping) {
+                crab.isJumping = true;
+                crab.velocityY = crab.jumpForce;
+            }
+        });
+
         window.addEventListener('resize', () => {
             if (gameStarted) {
                 initializeGame();
             }
         });
 
+        gameLoop();
 
     </script>
 </body>
